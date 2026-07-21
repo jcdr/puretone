@@ -5,6 +5,7 @@ Minimal full-screen Android app that generates a continuous mono sine wave.
 **Publisher:** jcdr  
 **Package:** `com.jcdr.puretone`  
 **Support:** puretone.support@gmail.com  
+**Source:** https://github.com/jcdr/puretone  
 **Stack:** Rust, egui/eframe, AAudio
 
 ## Features
