@@ -49,4 +49,4 @@ See [docs/privacy.md](docs/privacy.md).
 
 ## License
 
-All rights reserved unless a license file is added to this repository.
+GNU General Public License v3.0 — see [LICENSE](LICENSE).
