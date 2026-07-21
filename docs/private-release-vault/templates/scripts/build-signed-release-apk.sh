@@ -100,6 +100,16 @@ echo "Signed release APK:"
 ls -la "${DEST_APK}"
 echo
 echo "Upload this file in Google Play Console (or convert to AAB in a later vault pipeline)."
-echo "Install test (optional):"
-echo "  adb install -r \"${DEST_APK}\""
-echo "  adb shell am start -n ${ANDROID_APPLICATION_ID}/android.app.NativeActivity"
+echo "Install test (optional) — adb is often not on PATH; use platform-tools explicitly:"
+ADB_BIN="${ANDROID_HOME}/platform-tools/adb"
+if [[ ! -x "${ADB_BIN}" ]]; then
+  ADB_BIN="$(command -v adb 2>/dev/null || true)"
+fi
+if [[ -n "${ADB_BIN}" ]]; then
+  echo "  \"${ADB_BIN}\" install -r \"${DEST_APK}\""
+  echo "  \"${ADB_BIN}\" shell am start -n ${ANDROID_APPLICATION_ID}/android.app.NativeActivity"
+else
+  echo "  # Install Android SDK platform-tools, then:"
+  echo "  #   export PATH=\"\$HOME/Android/Sdk/platform-tools:\$PATH\""
+  echo "  #   adb install -r \"${DEST_APK}\""
+fi
