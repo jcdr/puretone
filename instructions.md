@@ -1,0 +1,16 @@
+The goal of this project is a minimal application for android smartphone to generate an audio sine wave.
+- Frequency from 50Hz to 4000Hz on log corrected scale.
+- Amplitude from -80dB to -0dB log corrected scale.
+- Full screen application that keep the screen on as long as the application has focus.
+- Frequency and amplitude are controlled by two vertical sliders.
+- Sliders uses each most of the available space (half of the screen split by a vertical axis).
+- Labels of each sliders appear on top of the sliders.
+- Font size of the labels allow comfortable read.
+- Minimal UI design.
+- Use rust and egui.
+- Code without comment.
+- Constants, variables, functions, classes names are explicit.
+- Commit often, check each commit for minimal diff, commit with appropriate message.
+- Program the test phone via USB ADB.
+- Public product name is Pure Tone, package com.jcdr.puretone, publisher jcdr.
+- This public source tree must not contain signing secrets or Play upload credentials.

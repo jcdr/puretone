@@ -1,0 +1,10 @@
+/target
+**/*.rs.bk
+.idea
+.vscode
+*.apk
+*.aab
+local.properties
+*.png
+*.jks
+*.keystore
