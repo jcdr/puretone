@@ -1,0 +1,57 @@
+plugins {
+    id("com.android.application")
+}
+
+val uploadStoreFile = System.getenv("PURETONE_UPLOAD_STORE_FILE")
+val uploadStorePassword = System.getenv("PURETONE_UPLOAD_STORE_PASSWORD")
+val uploadKeyAlias = System.getenv("PURETONE_UPLOAD_KEY_ALIAS")
+val uploadKeyPassword = System.getenv("PURETONE_UPLOAD_KEY_PASSWORD")
+val hasUploadSigning =
+    !uploadStoreFile.isNullOrBlank() &&
+        !uploadStorePassword.isNullOrBlank() &&
+        !uploadKeyAlias.isNullOrBlank() &&
+        !uploadKeyPassword.isNullOrBlank()
+
+android {
+    namespace = "com.jcdr.puretone"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.jcdr.puretone"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0.0"
+    }
+
+    signingConfigs {
+        if (hasUploadSigning) {
+            create("upload") {
+                storeFile = file(uploadStoreFile!!)
+                storePassword = uploadStorePassword
+                keyAlias = uploadKeyAlias
+                keyPassword = uploadKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (hasUploadSigning) {
+                signingConfig = signingConfigs.getByName("upload")
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}

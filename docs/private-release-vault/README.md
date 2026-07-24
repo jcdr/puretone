@@ -76,18 +76,29 @@ Still inside the vault:
 
 Store passwords in a password manager. Copy `upload.keystore` to encrypted offline backup.
 
-### 5. Build a signed release APK (uses public source)
+### 5. Build Play-compatible APK + AAB (uses public source)
+
+`cargo-apk` APKs are often **rejected** by Play (“cannot be analyzed using aapt”).  
+Use the Gradle packaging script instead:
 
 ```bash
 ./scripts/fetch-public-source.sh
-./scripts/build-signed-release-apk.sh
+./scripts/build-play-upload.sh
 ```
 
-Output path is printed by the script (under the vault’s `out/` directory).
+Output under `out/`:
 
-### 6. Upload to Play
+- `PureTone-play-….aab` — preferred for Play  
+- `PureTone-play-….apk` — also Play-compatible  
 
-In Play Console, create app **Pure Tone**, package **`com.jcdr.puretone`**, enable Play App Signing, upload the signed artifact from `out/`. Prefer AAB when your vault pipeline supports it; APK may be limited depending on Console rules—treat AAB as the production target.
+(The older `build-signed-release-apk.sh` is only for sideload/debug of cargo-apk packages, not for Play upload.)
+
+### 6. Upload to Play (e.g. Internal app sharing)
+
+1. Play Console → Pure Tone  
+2. Internal app sharing (or closed testing release)  
+3. Upload the **`.aab`** (or the new Gradle **`.apk`**) from `out/`  
+4. Open the share link on the phone
 
 ### 7. Commit the vault locally
 
