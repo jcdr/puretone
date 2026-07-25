@@ -3,8 +3,7 @@ set -euo pipefail
 
 export PATH="${HOME}/Android/Sdk/platform-tools:${PATH}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APK="${REPO_ROOT}/target/debug/apk/PureTone.apk"
 
 if [[ ! -f "${APK}" ]]; then

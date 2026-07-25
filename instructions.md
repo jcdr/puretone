@@ -13,4 +13,7 @@ The goal of this project is a minimal application for android smartphone to gene
 - Commit often, check each commit for minimal diff, commit with appropriate message.
 - Program the test phone via USB ADB.
 - Public product name is Pure Tone, package com.jcdr.puretone, publisher jcdr.
-- This public source tree must not contain signing secrets or Play upload credentials.
+- Support contact email is puretone.support@gmail.com.
+- Generate signing passwords with apg via ./scripts/init-local-secrets.sh.
+- Keep keystore and signing.env under .secrets/ which must never appear on GitHub.
+- Build Play APK/AAB in this repository with ./scripts/build-play-upload.sh into out/.

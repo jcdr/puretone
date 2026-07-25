@@ -17,9 +17,7 @@ Minimal full-screen Android app that generates a continuous mono sine wave.
 - Keeps the screen on while the app is focused  
 - Automatic reopen of the audio stream when output devices change (e.g. Bluetooth)
 
-## Development (this repository)
-
-This repository is **source only**. It does not contain release keystores, signing passwords, or Play upload automation.
+## Development
 
 ### Host checks
 
@@ -27,21 +25,35 @@ This repository is **source only**. It does not contain release keystores, signi
 cargo test --lib
 ```
 
-### Android debug APK (local device)
+### Debug APK (local device)
 
 Requires Android NDK/SDK, Rust target `aarch64-linux-android`, and `cargo-apk`.
 
 ```bash
 cargo apk build --lib
-adb install -r target/debug/apk/PureTone.apk
-adb shell am start -n com.jcdr.puretone/android.app.NativeActivity
+./scripts/install-debug-apk.sh
 ```
 
-Release signing and Play Store packaging are performed **outside** this repository by the publisher’s private release process.
+### Play-ready signed APK + AAB (local only)
 
-To create that private release vault on your own machine (without recording its location in this repo), follow:
+Signing material lives under **`.secrets/`** on your machine. It is **gitignored** and must never be pushed to GitHub.
 
-[docs/private-release-vault/README.md](docs/private-release-vault/README.md)
+One-time:
+
+```bash
+# requires: apg, JDK keytool, Android SDK/NDK
+./scripts/init-local-secrets.sh
+```
+
+Build (outputs in `out/`, also gitignored):
+
+```bash
+./scripts/build-play-upload.sh
+```
+
+Upload `out/PureTone-play-….aab` (or `.apk`) in Play Console (e.g. Internal app sharing).
+
+See [`.secrets/README.md`](.secrets/README.md).
 
 ## Privacy
 

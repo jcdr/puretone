@@ -9,3 +9,17 @@ local.properties
 *.jks
 *.keystore
 !android/app/src/main/res/**/*.png
+
+# Local signing secrets (never push)
+.secrets/**
+!.secrets/README.md
+!.secrets/.gitignore
+
+# Local Play build outputs
+/out/
+
+# Android local build products
+android/local.properties
+android/app/src/main/jniLibs/
+android/**/.gradle/
+android/**/build/
