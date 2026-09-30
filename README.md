@@ -27,12 +27,14 @@ cargo test --lib
 
 ### Debug APK (local device)
 
-Requires Android NDK/SDK, Rust target `aarch64-linux-android`, and `cargo-apk`.
+Requires the Android SDK and NDK (27.0.12077973), JDK 17, and the Rust targets `aarch64-linux-android`, `armv7-linux-androideabi` and `x86_64-linux-android`.
 
 ```bash
 ./scripts/build-debug-apk.sh
 ./scripts/install-debug-apk.sh
 ```
+
+The debug build compiles the native library for the three ABIs and packages it with Gradle (`android/app/build/outputs/apk/debug/app-debug.apk`). The first install over an older cargo-apk build needs `adb uninstall com.jcdr.puretone`, because the signing key changed.
 
 ### Play-ready signed APK + AAB (local only)
 

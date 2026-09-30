@@ -3,7 +3,7 @@
 | File | Role |
 |---|---|
 | `instructions.md` | Product requirements (source of truth for goals) |
-| `Cargo.toml` | eframe feature split; cargo-apk android metadata |
+| `Cargo.toml` | eframe feature split; release version `0.0.<version>` set by the release script |
 | `src/lib.rs` | `android_main`, desktop stub, module tree |
 | `src/app_ui.rs` | `PureToneApp`, custom vertical sliders, dark theme |
 | `src/audio_math.rs` | Log frequency, dB gain, sine/phase; unit tests |

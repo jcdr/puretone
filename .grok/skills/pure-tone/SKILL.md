@@ -29,7 +29,7 @@ Minimal Android smartphone app that generates an audio sine wave:
 | Rust + egui | `eframe` 0.31 + glow, `android-native-activity` |
 | No comments; explicit names | Enforced in code-style skill |
 | Commit often, small diffs | One concern per commit |
-| Deploy via USB ADB | `cargo apk` + `adb install -r` |
+| Deploy via USB ADB | `scripts/build-debug-apk.sh` + `adb install -r` |
 
 User-agreed defaults from planification:
 
@@ -56,7 +56,7 @@ Package: `com.jcdr.puretone` · APK label: `Pure Tone` · Activity: `android.app
 
 | Task | Skill |
 |---|---|
-| Toolchain, cargo-apk, ADB install/launch | `pure-tone-build-deploy` |
+| Toolchain, debug APK build, ADB install/launch | `pure-tone-build-deploy` |
 | Sine engine, AAudio, Bluetooth routing | `pure-tone-audio` |
 | Layout, custom sliders, keep-screen-on UI | `pure-tone-ui` |
 | Naming, no comments, tests, commits | `pure-tone-code-style` |
@@ -87,8 +87,8 @@ export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.0.12077973}"
 export JAVA_HOME="${JAVA_HOME:-$HOME/.local/jdk-17}"
 
 cargo test --lib
-cargo apk build --lib
-adb install -r target/debug/apk/PureTone.apk
+./scripts/build-debug-apk.sh
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.jcdr.puretone/android.app.NativeActivity
 adb logcat -s PureTone:V
 ```

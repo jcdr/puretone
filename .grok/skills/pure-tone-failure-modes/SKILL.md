@@ -34,10 +34,10 @@ adb shell pidof com.jcdr.puretone
 | Failure | Signals | Recovery |
 |---|---|---|
 | Host compile: winit unsupported | `compile_error!("The platform you're compiling for is not supported by winit")` | Enable eframe `wayland`+`x11` for non-Android target |
-| No Java | sdkmanager / cargo-apk errors | User-local JDK 17; `JAVA_HOME` |
+| No Java | sdkmanager / Gradle errors | User-local JDK 17; `JAVA_HOME` |
 | Missing NDK | linker / clang not found | `sdkmanager "ndk;27.0.12077973"`; `ANDROID_NDK_HOME` |
 | Need store release | not produced from this public tree | Publisher private release process |
-| Wrong ABI | Installs but won't load native lib | `build_targets = ["aarch64-linux-android"]` for arm64 phones |
+| Wrong ABI | Installs but won't load native lib | Check `android/app/src/main/jniLibs/<abi>/libpure_tone.so`; `scripts/lib-native.sh` builds arm64-v8a, armeabi-v7a, x86_64 |
 
 ### Launch / lifecycle
 

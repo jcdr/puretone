@@ -71,14 +71,14 @@ viewport: ViewportBuilder::default()
   .with_maximized(true)
 ```
 
-Plus cargo-apk application theme fullscreen.
+Plus the fullscreen theme in `android/app/src/main/AndroidManifest.xml`.
 
 ## Visual verification
 
 After UI changes:
 
 ```bash
-adb install -r target/debug/apk/PureTone.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.jcdr.puretone/android.app.NativeActivity
 adb shell screencap -p /sdcard/ui.png && adb pull /sdcard/ui.png
 ```

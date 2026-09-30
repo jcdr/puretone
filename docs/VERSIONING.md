@@ -28,7 +28,7 @@ How the version appears in each place:
 | Android `versionCode`          | version as integer                                        | `26093000`                      |
 | Android `versionName`          | version as string                                         | `"26093000"`                    |
 | Play Console release name      | version (prefilled from `versionName`)                    | `26093000`                      |
-| `Cargo.toml` package version   | `<version>.0.0`                                           | `26093000.0.0`                  |
+| `Cargo.toml` package version   | `0.0.<version>`                                           | `0.0.26093000`                  |
 | git tag (annotated)            | `v<version>`                                              | `v26093000`                     |
 | Upload files                   | `out/PureTone-<version>.aab`, `out/PureTone-<version>.apk` | `out/PureTone-26093000.aab`     |
 | Release notes (optional)       | `fastlane/metadata/android/en-GB/changelogs/<version>.txt` | `changelogs/26093000.txt`      |
@@ -90,25 +90,50 @@ Source: <https://support.google.com/googleplay/android-developer/answer/9859348>
 ### Cargo package version
 
 Cargo requires a Semantic Versioning `major.minor.patch` version, so a bare `26093000`
-is rejected. `26093000.0.0` is valid. A date form such as `26.09.30` is rejected because
-SemVer forbids leading zeros in numeric components. Each component is a 64-bit unsigned
-integer, so the size of `26093000` is not a problem.
+is rejected. Release builds use `0.0.<version>`, for example `0.0.26093000`:
+
+- It is valid SemVer. Each component is a 64-bit unsigned integer, so the size of the
+  patch is not a problem.
+- It has no leading zero: the version is an integer, so the patch never starts with `0`.
+  SemVer forbids leading zeros in numeric components, which is why a date form such as
+  `26.09.30` is rejected.
+- It is monotonic: with major and minor fixed at 0, SemVer precedence is the numeric
+  order of the patch, which is the order of the versions.
+- The century prefix from 2100 on only makes the patch longer (`0.0.100010100`).
+
+Splitting the version into several components (for example `26.930.0` for yy.mmdd.nn)
+would also be valid SemVer, but it breaks the single number. The package is not
+published (`publish = false`), so Cargo's compatibility rules for `0.0.x` do not matter.
 
 Sources:
 <https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field>,
 <https://semver.org/>
 
-### cargo-apk (debug builds)
+### Debug builds (no cargo-apk)
 
-`cargo apk` derives the APK `versionCode` from the Cargo version and requires major,
-minor and patch to be at most 255 each; it also refuses a `version_code` override in
-`Cargo.toml`. `26093000.0.0` therefore fails with cargo-apk. `scripts/build-debug-apk.sh`
-builds the debug APK with a temporary Cargo version `0.0.0+<version>` and restores
-`Cargo.toml` and `Cargo.lock` afterwards. Debug APKs are never uploaded to Play, so their
-`versionCode` does not matter.
+Debug APKs are built like Play builds: `cargo build` per ABI (arm64-v8a, armeabi-v7a,
+x86_64) with the NDK clang, the libraries copied to `android/app/src/main/jniLibs/`, and
+Gradle packaging them (`:app:assembleDebug`). A debug APK therefore carries a scheme
+version as `versionCode` and `versionName`.
 
-Source: `VersionCode::from_semver` and `ApkBuilder::from_subcommand` in
-<https://github.com/rust-mobile/cargo-apk> (`ndk-build/src/cargo.rs`, `cargo-apk/src/apk.rs`)
+cargo-apk is not used because it cannot express the scheme:
+
+- It derives `versionCode` as `1<<24 | major<<16 | minor<<8 | patch` and requires major,
+  minor and patch to be at most 255 each, otherwise it fails with `Invalid semver`.
+  `0.0.26093000`, `26093000.0.0` and every readable split of the version fail (day and
+  `nn` together need up to 3199); even the splits that fit would not give the scheme code.
+- It panics if `version_code` or `version_name` is set in `[package.metadata.android]`
+  (every release from 0.7.0 to 0.10.0 and the current main branch).
+- It is deprecated in favour of xbuild, which is itself marked unmaintained.
+
+Gradle signs debug APKs with its own debug key, which differs from the key cargo-apk
+used. A device that still has a cargo-apk debug build needs `adb uninstall
+com.jcdr.puretone` once (this deletes the app data). A debug APK can never replace the
+Play build either, since that one is signed with the Play key.
+
+Sources: `VersionCode::from_semver` and `ApkBuilder::from_subcommand` in
+<https://github.com/rust-mobile/cargo-apk> (`ndk-build/src/cargo.rs`, `cargo-apk/src/apk.rs`),
+<https://github.com/rust-mobile/xbuild>
 
 ### git tag with a `v` prefix
 
@@ -152,7 +177,7 @@ instead of concatenating strings, gives this automatically.
   (years 4000–4099) the maximum is `2099123199`, which fits. From 4100 (`c = 21`) the
   first version `2100010100` exceeds the Play limit. The scheme is valid until the end
   of 4099.
-- `100010100.0.0` is still valid SemVer (no leading zero), and tags stay `v<version>`;
+- `0.0.100010100` is still valid SemVer (no leading zero), and tags stay `v<version>`;
   9- and 10-digit numbers are also valid hex, so the `v` prefix is still needed.
 - Years 2000–2009 would give fewer than 8 digits (a leading zero year is dropped by the
   integer). This does not matter: the scheme started in 2026, and the tools accept 8 to
@@ -175,12 +200,20 @@ published on Play internal testing. They have no git tags; 1.0.1 is commit `ee04
   the `PURETONE_VERSION` environment variable and uses it as `versionCode` and
   `versionName`. The value must be 8 to 10 digits without a leading zero and at most
   2,100,000,000, otherwise the build fails. Release tasks fail if no version is given.
-  Other builds fall back to `Cargo.toml`: `<version>.0.0` gives code `<version>` and name
+  Other builds fall back to `Cargo.toml`: `0.0.<version>` gives code `<version>` and name
   `<version>-local`; anything else gives code 1 and name `<cargo version>-local`.
   `./gradlew :app:printVersion [-PpuretoneVersion=…]` shows the resolved values.
 - `Cargo.toml` in `main` always holds the last released version. It stays `1.0.1` until
   the first release built with this scheme; `scripts/build-play-upload.sh` sets
-  `<version>.0.0` (and updates `Cargo.lock`) at release time and commits it.
+  `0.0.<version>` (and updates `Cargo.lock`) at release time and commits it.
+- `scripts/lib-native.sh` builds `libpure_tone.so` for arm64-v8a, armeabi-v7a and x86_64
+  with the NDK clang and copies it to `android/app/src/main/jniLibs/`; both build
+  scripts use it.
+- `scripts/build-debug-apk.sh` builds debug native libraries and runs
+  `:app:assembleDebug` with `PURETONE_VERSION` or, by default,
+  `scripts/next-version.sh --local`. The output is
+  `android/app/build/outputs/apk/debug/app-debug.apk`; `scripts/install-debug-apk.sh`
+  installs and starts it.
 - `scripts/build-play-upload.sh` builds, signs, copies the outputs to
   `out/PureTone-<version>.aab/.apk`, commits `Release <version>` and creates the annotated
   tag `v<version>`, all locally. It never pushes. If the build fails it restores

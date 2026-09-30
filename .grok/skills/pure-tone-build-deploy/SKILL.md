@@ -1,13 +1,13 @@
 ---
 name: pure-tone-build-deploy
 description: >
-  Build and ADB-deploy the pure-tone Rust/egui debug APK with cargo-apk.
+  Build and ADB-deploy the pure-tone Rust/egui debug APK (cargo + NDK clang, Gradle packaging).
   Use when installing toolchains, packaging debug APKs, fixing NDK/JDK/SDK env,
-  running cargo apk, adb install, launching NativeActivity, or when the user
+  running build-debug-apk.sh, adb install, launching NativeActivity, or when the user
   runs /pure-tone-build-deploy. Also when builds fail for aarch64-linux-android.
   Release signing and Play upload are outside this public repository.
 metadata:
-  short-description: "cargo-apk + ADB debug build for Pure Tone"
+  short-description: "Gradle + ADB debug build for Pure Tone"
 ---
 
 # Pure Tone build and deploy (public source tree)
@@ -16,7 +16,7 @@ metadata:
 
 This public tree supports **development and debug installs** only.
 
-- **In scope:** `cargo test`, `cargo apk build --lib` (debug), `adb install` of debug APK  
+- **In scope:** `cargo test`, `scripts/build-debug-apk.sh` (debug), `adb install` of debug APK  
 - **Out of scope:** release keystores, signing passwords, Play Console upload automation  
 
 Store release packaging is performed by the publisher’s **private** process, not from scripts in this repo.
@@ -30,7 +30,7 @@ Store release packaging is performed by the publisher’s **private** process, n
 | `JAVA_HOME` | JDK 17+ |
 | `PATH` | cargo, platform-tools, JDK bin |
 
-Also: Rust stable, target `aarch64-linux-android`, `cargo-apk`.
+Also: Rust stable, targets `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`. cargo-apk is not used (see `docs/VERSIONING.md`).
 
 ## Package identity
 
@@ -46,10 +46,10 @@ Also: Rust stable, target `aarch64-linux-android`, `cargo-apk`.
 ```bash
 cargo test --lib
 ./scripts/build-debug-apk.sh
-# Output: target/debug/apk/PureTone.apk
+# Output: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`scripts/build-debug-apk.sh` runs `cargo apk build --lib`. cargo-apk needs Cargo version parts ≤ 255, so with a release version such as `26093000.0.0` it builds with a temporary `0.0.0+26093000` and restores `Cargo.toml`/`Cargo.lock` (see `docs/VERSIONING.md`).
+`scripts/build-debug-apk.sh` builds debug `libpure_tone.so` for arm64-v8a, armeabi-v7a and x86_64 with the NDK clang (`scripts/lib-native.sh`, shared with the Play build), copies them to `android/app/src/main/jniLibs/` and runs `./gradlew :app:assembleDebug -PpuretoneVersion=<version>`. The version is `PURETONE_VERSION` or `scripts/next-version.sh --local`; `Cargo.toml` is not touched. cargo-apk was dropped: its ≤ 255 limit per version part and its `version_code` override panic make the version scheme impossible (see `docs/VERSIONING.md`).
 
 ## Install on a device
 
@@ -60,9 +60,11 @@ cargo test --lib
 Or:
 
 ```bash
-adb install -r target/debug/apk/PureTone.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.jcdr.puretone/android.app.NativeActivity
 ```
+
+The Gradle debug key differs from the key of older cargo-apk builds and from the Play key. If `adb install` fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, run `adb uninstall com.jcdr.puretone` once (deletes the app data). Never do this on a device where the Play build must be kept.
 
 ## Logs
 
