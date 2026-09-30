@@ -21,25 +21,3 @@ eframe = { version = "0.31", default-features = false, features = ["glow", "defa
 winit = { version = "0.30", default-features = false, features = ["android-native-activity"] }
 android_logger = "0.14"
 jni = "0.21"
-
-[package.metadata.android]
-package = "com.jcdr.puretone"
-build_targets = [
-    "aarch64-linux-android",
-    "armv7-linux-androideabi",
-    "x86_64-linux-android",
-]
-apk_name = "PureTone"
-
-[package.metadata.android.sdk]
-min_sdk_version = 26
-target_sdk_version = 36
-
-[package.metadata.android.application]
-label = "Pure Tone"
-theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
-debuggable = false
-
-[package.metadata.android.application.activity]
-exported = true
-config_changes = "orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|density|uiMode"

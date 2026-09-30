@@ -133,53 +133,11 @@ if [[ -n "${CHANGELOG_FILE}" ]]; then
   cp "${NOTES_FILE}" "${CHANGELOG_FILE}"
 fi
 
-rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android >/dev/null
-
-PREBUILT="$(ls -d "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/"* 2>/dev/null | head -1)"
-if [[ ! -d "${PREBUILT}/bin" ]]; then
-  echo "NDK clang not found under ${ANDROID_NDK_HOME}"
-  exit 1
-fi
-
-# rust target | NDK clang name (API 26) | jniLibs ABI directory
-build_native_abi() {
-  local rust_target="$1"
-  local clang_name="$2"
-  local abi="$3"
-  local clang="${PREBUILT}/bin/${clang_name}"
-  if [[ ! -x "${clang}" ]]; then
-    echo "NDK clang not found: ${clang}"
-    exit 1
-  fi
-  local upper="${rust_target^^}"
-  upper="${upper//-/_}"
-  local linker_var="CARGO_TARGET_${upper}_LINKER"
-  local cc_var="CC_${rust_target//-/_}"
-  local ar_var="AR_${rust_target//-/_}"
-  export "${linker_var}=${clang}"
-  export "${cc_var}=${clang}"
-  export "${ar_var}=${PREBUILT}/bin/llvm-ar"
-  cargo build --release --target "${rust_target}" --lib
-  local so_src="${REPO_ROOT}/target/${rust_target}/release/libpure_tone.so"
-  if [[ ! -f "${so_src}" ]]; then
-    echo "Native library not found: ${so_src}"
-    exit 1
-  fi
-  local jni_dir="${JNI_ROOT}/${abi}"
-  mkdir -p "${jni_dir}"
-  cp "${so_src}" "${jni_dir}/libpure_tone.so"
-  echo "Copied libpure_tone.so into android/app/src/main/jniLibs/${abi}/"
-}
+# shellcheck source=scripts/lib-native.sh
+source "${REPO_ROOT}/scripts/lib-native.sh"
 
 echo "=== 1/4 Build native libraries (release: arm64-v8a, armeabi-v7a, x86_64) ==="
-JNI_ROOT="${REPO_ROOT}/android/app/src/main/jniLibs"
-rm -rf "${JNI_ROOT}"
-(
-  cd "${REPO_ROOT}"
-  build_native_abi aarch64-linux-android aarch64-linux-android26-clang arm64-v8a
-  build_native_abi armv7-linux-androideabi armv7a-linux-androideabi26-clang armeabi-v7a
-  build_native_abi x86_64-linux-android x86_64-linux-android26-clang x86_64
-)
+build_native_libs release
 
 echo "=== 2/4 Build Play APK + AAB with Gradle ==="
 export PURETONE_UPLOAD_STORE_FILE="${KEYSTORE_PATH}"
