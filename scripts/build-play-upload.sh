@@ -43,6 +43,7 @@ if [[ ! "${RELEASE_VERSION}" =~ ^[1-9][0-9]{7,9}$ ]] || (( RELEASE_VERSION > 210
   echo "Invalid version '${RELEASE_VERSION}': expected yymmddnn (8 to 10 digits, at most 2100000000)."
   exit 1
 fi
+export PURETONE_VERSION="${RELEASE_VERSION}"
 RELEASE_TAG="v${RELEASE_VERSION}"
 if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
   echo "Tag ${RELEASE_TAG} already exists."
@@ -121,10 +122,11 @@ restore_version_files() {
 }
 trap restore_version_files EXIT
 
-echo "=== Set Cargo version ${RELEASE_VERSION}.0.0 ==="
-sed -i -E '0,/^version = "[^"]*"/s//version = "'"${RELEASE_VERSION}"'.0.0"/' "${REPO_ROOT}/Cargo.toml"
+CARGO_VERSION="0.0.${RELEASE_VERSION}"
+echo "=== Set Cargo version ${CARGO_VERSION} ==="
+sed -i -E '0,/^version = "[^"]*"/s//version = "'"${CARGO_VERSION}"'"/' "${REPO_ROOT}/Cargo.toml"
 cargo update --workspace --quiet
-if ! grep -q "^version = \"${RELEASE_VERSION}.0.0\"" "${REPO_ROOT}/Cargo.toml"; then
+if ! grep -q "^version = \"${CARGO_VERSION}\"" "${REPO_ROOT}/Cargo.toml"; then
   echo "Failed to set version in Cargo.toml"
   exit 1
 fi

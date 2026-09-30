@@ -41,8 +41,8 @@ val cargoPackageVersion =
         ?.substringBefore("\"")
         ?: "0.0.0"
 val cargoSchemeVersionCode =
-    cargoPackageVersion.removeSuffix(".0.0")
-        .takeIf { cargoPackageVersion.endsWith(".0.0") && schemeVersionPattern.matches(it) && it.toLong() <= playMaxVersionCode }
+    cargoPackageVersion.removePrefix("0.0.")
+        .takeIf { cargoPackageVersion.startsWith("0.0.") && schemeVersionPattern.matches(it) && it.toLong() <= playMaxVersionCode }
         ?.toInt()
 
 val resolvedVersionCode = explicitVersionCode ?: cargoSchemeVersionCode ?: 1
