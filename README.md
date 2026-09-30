@@ -30,7 +30,7 @@ cargo test --lib
 Requires Android NDK/SDK, Rust target `aarch64-linux-android`, and `cargo-apk`.
 
 ```bash
-cargo apk build --lib
+./scripts/build-debug-apk.sh
 ./scripts/install-debug-apk.sh
 ```
 
@@ -51,7 +51,7 @@ Build (outputs in `out/`, also gitignored):
 ./scripts/build-play-upload.sh
 ```
 
-Upload `out/PureTone-play-….aab` (or `.apk`) in Play Console (e.g. Internal app sharing).
+The script picks the next version (`yymmddnn`, UTC date + daily counter), builds and signs `out/PureTone-<version>.aab` (and `.apk`), then commits `Release <version>` and tags `v<version>` locally; it never pushes. Upload the `.aab` in Play Console. See [docs/VERSIONING.md](docs/VERSIONING.md).
 
 See [`.secrets/README.md`](.secrets/README.md).
 
