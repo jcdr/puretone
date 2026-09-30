@@ -1,6 +1,6 @@
 [package]
 name = "pure_tone"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 publish = false
 
@@ -24,7 +24,11 @@ jni = "0.21"
 
 [package.metadata.android]
 package = "com.jcdr.puretone"
-build_targets = ["aarch64-linux-android"]
+build_targets = [
+    "aarch64-linux-android",
+    "armv7-linux-androideabi",
+    "x86_64-linux-android",
+]
 apk_name = "PureTone"
 
 [package.metadata.android.sdk]
@@ -37,6 +41,5 @@ theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
 debuggable = false
 
 [package.metadata.android.application.activity]
-orientation = "portrait"
 exported = true
-config_changes = "orientation|keyboardHidden|screenSize|screenLayout"
+config_changes = "orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|density|uiMode"
