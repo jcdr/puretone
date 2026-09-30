@@ -8,7 +8,7 @@ APK="${REPO_ROOT}/target/debug/apk/PureTone.apk"
 
 if [[ ! -f "${APK}" ]]; then
   echo "Missing ${APK}"
-  echo "Build first with: cargo apk build --lib"
+  echo "Build first with: ./scripts/build-debug-apk.sh"
   exit 1
 fi
 

@@ -45,9 +45,11 @@ Also: Rust stable, target `aarch64-linux-android`, `cargo-apk`.
 
 ```bash
 cargo test --lib
-cargo apk build --lib
+./scripts/build-debug-apk.sh
 # Output: target/debug/apk/PureTone.apk
 ```
+
+`scripts/build-debug-apk.sh` runs `cargo apk build --lib`. cargo-apk needs Cargo version parts ≤ 255, so with a release version such as `26093000.0.0` it builds with a temporary `0.0.0+26093000` and restores `Cargo.toml`/`Cargo.lock` (see `docs/VERSIONING.md`).
 
 ## Install on a device
 
