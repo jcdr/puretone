@@ -9,6 +9,7 @@ local.properties
 *.jks
 *.keystore
 !android/app/src/main/res/**/*.png
+!fastlane/**/*.png
 
 # Local signing secrets (never push)
 .secrets/**
