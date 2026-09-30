@@ -10,8 +10,8 @@ Minimal full-screen Android app that generates a continuous mono sine wave.
 
 ## Features
 
-- Frequency **50–4000 Hz** on a logarithmic slider scale  
-- Amplitude **−80–0 dB**  
+- Frequency **20–20000 Hz** on a logarithmic slider scale  
+- Amplitude **−100–0 dB**  
 - Dual vertical sliders, dark minimal UI  
 - Live tone from launch; parameters update smoothly  
 - Keeps the screen on while the app is focused  

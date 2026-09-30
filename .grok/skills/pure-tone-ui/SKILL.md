@@ -20,7 +20,7 @@ metadata:
 - Defaults: 440 Hz, −20 dB
 
 Frequency slider stores **log-normalized** position in `[0,1]` and maps via `frequency_hertz_from_log_normalized`.  
-Amplitude slider stores **dB** in `[-80, 0]`.
+Amplitude slider stores **dB** in `[-100, 0]`.
 
 ## Why custom sliders (not stock `egui::Slider`)
 

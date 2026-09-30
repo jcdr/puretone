@@ -1,6 +1,6 @@
 The goal of this project is a minimal application for android smartphone to generate an audio sine wave.
-- Frequency from 50Hz to 4000Hz on log corrected scale.
-- Amplitude from -80dB to -0dB log corrected scale.
+- Frequency from 20Hz to 20000Hz on log corrected scale.
+- Amplitude from -100dB to -0dB log corrected scale.
 - Full screen application that keep the screen on as long as the application has focus.
 - Frequency and amplitude are controlled by two vertical sliders.
 - Sliders uses each most of the available space (half of the screen split by a vertical axis).

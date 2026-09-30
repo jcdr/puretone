@@ -12,8 +12,8 @@ const DEFAULT_FREQUENCY_HERTZ: f32 = 440.0;
 const DEFAULT_AMPLITUDE_DECIBELS: f32 = -20.0;
 const LABEL_FONT_SIZE: f32 = 28.0;
 const VALUE_FONT_SIZE: f32 = 28.0;
-const FREQUENCY_NUMBER_DIGIT_SLOTS: usize = 4;
-const AMPLITUDE_NUMBER_DIGIT_SLOTS: usize = 5;
+const FREQUENCY_NUMBER_DIGIT_SLOTS: usize = 5;
+const AMPLITUDE_NUMBER_DIGIT_SLOTS: usize = 6;
 const SLIDER_THICKNESS_FRACTION_OF_HALF: f32 = 0.50;
 const SLIDER_RAIL_FRACTION_OF_THICKNESS: f32 = 0.22;
 const SLIDER_RAIL_COLOR: Color32 = Color32::from_rgb(60, 60, 60);
@@ -485,7 +485,10 @@ impl eframe::App for PureToneApp {
 
 #[cfg(test)]
 mod layout_tests {
-    use super::PureToneApp;
+    use super::{PureToneApp, AMPLITUDE_NUMBER_DIGIT_SLOTS, FREQUENCY_NUMBER_DIGIT_SLOTS};
+    use crate::audio_math::{
+        frequency_hertz_from_log_normalized, MAXIMUM_AMPLITUDE_DECIBELS, MINIMUM_AMPLITUDE_DECIBELS,
+    };
     use eframe::egui::{self, pos2, vec2, Color32, Rect};
 
     fn run_at(width: f32, height: f32, check: impl FnOnce(&mut egui::Ui)) {
@@ -533,7 +536,7 @@ mod layout_tests {
                     "Frequency",
                     "440".to_string(),
                     " Hz",
-                    4,
+                    FREQUENCY_NUMBER_DIGIT_SLOTS,
                     &mut frequency,
                     0.0,
                     1.0,
@@ -545,10 +548,10 @@ mod layout_tests {
                     "Amplitude",
                     "-20.0".to_string(),
                     " dB",
-                    5,
+                    AMPLITUDE_NUMBER_DIGIT_SLOTS,
                     &mut amplitude,
-                    -80.0,
-                    0.0,
+                    MINIMUM_AMPLITUDE_DECIBELS,
+                    MAXIMUM_AMPLITUDE_DECIBELS,
                 )
                 .rect;
             });
@@ -586,7 +589,7 @@ mod layout_tests {
                     "Frequency",
                     "440".to_string(),
                     " Hz",
-                    4,
+                    FREQUENCY_NUMBER_DIGIT_SLOTS,
                     &mut frequency,
                     0.0,
                     1.0,
@@ -598,10 +601,10 @@ mod layout_tests {
                     "Amplitude",
                     "-20.0".to_string(),
                     " dB",
-                    5,
+                    AMPLITUDE_NUMBER_DIGIT_SLOTS,
                     &mut amplitude,
-                    -80.0,
-                    0.0,
+                    MINIMUM_AMPLITUDE_DECIBELS,
+                    MAXIMUM_AMPLITUDE_DECIBELS,
                 )
                 .rect;
             });
@@ -644,7 +647,7 @@ mod layout_tests {
                             "Frequency",
                             "440".to_string(),
                             " Hz",
-                            4,
+                            FREQUENCY_NUMBER_DIGIT_SLOTS,
                             &mut frequency,
                             0.0,
                             1.0,
@@ -656,10 +659,10 @@ mod layout_tests {
                             "Amplitude",
                             "-20.0".to_string(),
                             " dB",
-                            5,
+                            AMPLITUDE_NUMBER_DIGIT_SLOTS,
                             &mut amplitude,
-                            -80.0,
-                            0.0,
+                            MINIMUM_AMPLITUDE_DECIBELS,
+                            MAXIMUM_AMPLITUDE_DECIBELS,
                         )
                         .rect;
                     });
@@ -672,5 +675,74 @@ mod layout_tests {
             assert!(amplitude_rect.height() > 20.0);
             assert!(frequency_rect.center().x + 80.0 < amplitude_rect.center().x);
         });
+    }
+
+    #[test]
+    fn extreme_values_fit_their_digit_slots() {
+        let widest_frequency =
+            PureToneApp::format_frequency_number(frequency_hertz_from_log_normalized(1.0));
+        let lowest_frequency =
+            PureToneApp::format_frequency_number(frequency_hertz_from_log_normalized(0.0));
+        let widest_amplitude = PureToneApp::format_amplitude_number(MINIMUM_AMPLITUDE_DECIBELS);
+        assert_eq!(widest_frequency, "20000");
+        assert_eq!(lowest_frequency, "20");
+        assert_eq!(widest_amplitude, "-100.0");
+        assert!(widest_frequency.chars().count() <= FREQUENCY_NUMBER_DIGIT_SLOTS);
+        assert!(widest_amplitude.chars().count() <= AMPLITUDE_NUMBER_DIGIT_SLOTS);
+    }
+
+    #[test]
+    fn widest_values_fit_full_size_in_portrait_and_landscape() {
+        for (width, height) in [(360.0, 740.0), (400.0, 800.0), (800.0, 360.0)] {
+            run_at(width, height, |ui| {
+                let available = ui.available_size();
+                let layout = PureToneApp::control_layout(ui, available);
+                assert!(!layout.needs_scroll, "{width}x{height}");
+                assert!(
+                    (layout.value_font_size - 28.0).abs() < 0.01,
+                    "{width}x{height}: {}",
+                    layout.value_font_size
+                );
+                let column_width = (available.x - ui.spacing().item_spacing.x) / 2.0;
+                let widest = PureToneApp::widest_control(ui, 1.0);
+                assert!(
+                    widest <= column_width - 2.0,
+                    "{width}x{height}: {widest} > {column_width}"
+                );
+
+                let mut frequency = 1.0_f32;
+                let mut amplitude = MINIMUM_AMPLITUDE_DECIBELS;
+                let mut frequency_rect = Rect::NOTHING;
+                let mut amplitude_rect = Rect::NOTHING;
+                ui.columns(2, |columns| {
+                    frequency_rect = PureToneApp::paint_half_column(
+                        &mut columns[0],
+                        &layout,
+                        "Frequency",
+                        "20000".to_string(),
+                        " Hz",
+                        FREQUENCY_NUMBER_DIGIT_SLOTS,
+                        &mut frequency,
+                        0.0,
+                        1.0,
+                    )
+                    .rect;
+                    amplitude_rect = PureToneApp::paint_half_column(
+                        &mut columns[1],
+                        &layout,
+                        "Amplitude",
+                        "-100.0".to_string(),
+                        " dB",
+                        AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                        &mut amplitude,
+                        MINIMUM_AMPLITUDE_DECIBELS,
+                        MAXIMUM_AMPLITUDE_DECIBELS,
+                    )
+                    .rect;
+                });
+                assert!(frequency_rect.right() <= amplitude_rect.left() + 1.0);
+                assert!(amplitude_rect.right() <= available.x + 1.0);
+            });
+        }
     }
 }

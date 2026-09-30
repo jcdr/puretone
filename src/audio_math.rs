@@ -1,6 +1,6 @@
-pub const MINIMUM_FREQUENCY_HERTZ: f32 = 50.0;
-pub const MAXIMUM_FREQUENCY_HERTZ: f32 = 4000.0;
-pub const MINIMUM_AMPLITUDE_DECIBELS: f32 = -80.0;
+pub const MINIMUM_FREQUENCY_HERTZ: f32 = 20.0;
+pub const MAXIMUM_FREQUENCY_HERTZ: f32 = 20000.0;
+pub const MINIMUM_AMPLITUDE_DECIBELS: f32 = -100.0;
 pub const MAXIMUM_AMPLITUDE_DECIBELS: f32 = 0.0;
 pub const AUDIO_SAMPLE_RATE_HERTZ: u32 = 48_000;
 pub const TWO_PI: f32 = std::f32::consts::TAU;
@@ -90,7 +90,7 @@ mod tests {
         let minimum = frequency_hertz_from_log_normalized(0.0);
         let maximum = frequency_hertz_from_log_normalized(1.0);
         assert!((minimum - MINIMUM_FREQUENCY_HERTZ).abs() < 1e-3);
-        assert!((maximum - MAXIMUM_FREQUENCY_HERTZ).abs() < 1e-2);
+        assert!((maximum - MAXIMUM_FREQUENCY_HERTZ).abs() < MAXIMUM_FREQUENCY_HERTZ * 1e-5);
     }
 
     #[test]
@@ -102,10 +102,13 @@ mod tests {
 
     #[test]
     fn log_frequency_round_trip() {
-        for frequency in [50.0_f32, 100.0, 440.0, 1000.0, 4000.0] {
+        for frequency in [20.0_f32, 50.0, 100.0, 440.0, 1000.0, 4000.0, 20000.0] {
             let normalized = log_normalized_from_frequency_hertz(frequency);
             let restored = frequency_hertz_from_log_normalized(normalized);
-            assert!((restored - frequency).abs() < 1e-2, "failed at {frequency}");
+            assert!(
+                (restored - frequency).abs() < frequency * 1e-5,
+                "failed at {frequency}"
+            );
         }
     }
 
@@ -127,6 +130,39 @@ mod tests {
         assert!(gain > 0.0);
         assert!(gain < 0.0002);
         assert!((gain - 1e-4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn decibel_minus_hundred_is_hundred_thousandth_gain() {
+        let gain = linear_gain_from_decibels(MINIMUM_AMPLITUDE_DECIBELS);
+        assert!((MINIMUM_AMPLITUDE_DECIBELS + 100.0).abs() < 1e-6);
+        assert!(gain > 0.0);
+        assert!((gain - 1e-5).abs() < 1e-8);
+        assert!((linear_gain_from_decibels(-120.0) - gain).abs() < 1e-12);
+    }
+
+    #[test]
+    fn frequency_range_is_twenty_hertz_to_twenty_kilohertz() {
+        assert!((MINIMUM_FREQUENCY_HERTZ - 20.0).abs() < 1e-6);
+        assert!((MAXIMUM_FREQUENCY_HERTZ - 20000.0).abs() < 1e-3);
+        assert!((log_normalized_from_frequency_hertz(10.0)).abs() < 1e-6);
+        assert!((log_normalized_from_frequency_hertz(30000.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn maximum_frequency_stays_below_nyquist() {
+        assert!(AUDIO_SAMPLE_RATE_HERTZ >= 44_100);
+        assert!(MAXIMUM_FREQUENCY_HERTZ < AUDIO_SAMPLE_RATE_HERTZ as f32 / 2.0);
+    }
+
+    #[test]
+    fn phase_stays_wrapped_at_maximum_frequency() {
+        let sample_rate = AUDIO_SAMPLE_RATE_HERTZ as f32;
+        let mut phase = 0.0_f32;
+        for _ in 0..AUDIO_SAMPLE_RATE_HERTZ {
+            phase = advance_phase_radians(phase, MAXIMUM_FREQUENCY_HERTZ, sample_rate);
+            assert!((0.0..TWO_PI).contains(&phase), "{phase}");
+        }
     }
 
     #[test]

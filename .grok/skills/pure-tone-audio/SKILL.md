@@ -34,12 +34,12 @@ sliders → set_frequency_hertz  →  AtomicU32 bits
 
 ```text
 f = f_min * (f_max/f_min)^t     t ∈ [0,1]   log frequency
-g = 10^(dB/20)                  dB ∈ [-80,0]
+g = 10^(dB/20)                  dB ∈ [-100,0]
 sample = sin(phase) * g
 phase += 2π * f / sample_rate   wrap with % 2π when ≥ 2π
 ```
 
-Unit tests must call **these real functions** (endpoints, geometric mean at t=0.5, round-trip, 0 dB → 1, −20 dB → 0.1, −80 dB → 1e-4, phase advance). Never re-implement the formulas only inside the test oracle.
+Unit tests must call **these real functions** (endpoints, geometric mean at t=0.5, round-trip, 0 dB → 1, −20 dB → 0.1, −80 dB → 1e-4, −100 dB → 1e-5, phase advance and wrap at 20 kHz, 20 kHz below Nyquist). Never re-implement the formulas only inside the test oracle.
 
 ## AAudio path (Android)
 

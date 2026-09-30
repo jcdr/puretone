@@ -20,8 +20,8 @@ Minimal Android smartphone app that generates an audio sine wave:
 
 | Requirement | Implementation fact |
 |---|---|
-| Frequency 50–4000 Hz, log-corrected | `audio_math::frequency_hertz_from_log_normalized` |
-| Amplitude −80–0 dB | Linear-in-dB slider; `linear_gain_from_decibels` for sample scale |
+| Frequency 20–20000 Hz, log-corrected | `audio_math::frequency_hertz_from_log_normalized` |
+| Amplitude −100–0 dB | Linear-in-dB slider; `linear_gain_from_decibels` for sample scale |
 | Fullscreen, keep screen on while focused | Theme + viewport fullscreen; JNI `FLAG_KEEP_SCREEN_ON` |
 | Two vertical sliders, each ~half width | Custom painted sliders in `app_ui.rs` |
 | Labels on top, comfortable font | Name + live value, 28 pt |
