@@ -1,0 +1,1 @@
+Value labels stay fixed while you move the sliders. The tone now pauses in the background and resumes when you return.
