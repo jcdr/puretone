@@ -4,16 +4,16 @@ use crate::audio_math::{
     MAXIMUM_AMPLITUDE_DECIBELS, MINIMUM_AMPLITUDE_DECIBELS,
 };
 use eframe::egui::{
-    self, pos2, Align, Color32, FontFamily, FontId, Layout, Rect, RichText, Sense, Shape, Stroke,
-    Vec2,
+    self, pos2, Align, Align2, Color32, FontFamily, FontId, Layout, Rect, RichText, Sense, Shape,
+    Stroke, Vec2,
 };
 
 const DEFAULT_FREQUENCY_HERTZ: f32 = 440.0;
 const DEFAULT_AMPLITUDE_DECIBELS: f32 = -20.0;
 const LABEL_FONT_SIZE: f32 = 28.0;
 const VALUE_FONT_SIZE: f32 = 28.0;
-const FREQUENCY_NUMBER_DIGIT_SLOTS: usize = 5;
-const AMPLITUDE_NUMBER_DIGIT_SLOTS: usize = 6;
+const FREQUENCY_WIDEST_NUMBER_TEMPLATE: &str = "00000";
+const AMPLITUDE_WIDEST_NUMBER_TEMPLATE: &str = "-000.0";
 const SLIDER_THICKNESS_FRACTION_OF_HALF: f32 = 0.50;
 const SLIDER_RAIL_FRACTION_OF_THICKNESS: f32 = 0.22;
 const SLIDER_RAIL_COLOR: Color32 = Color32::from_rgb(60, 60, 60);
@@ -80,61 +80,84 @@ impl PureToneApp {
         format!("{:.1}", amplitude_decibels)
     }
 
-    fn value_figure_width(ui: &egui::Ui, font_id: &FontId) -> f32 {
+    /// Width of the fixed number box for `widest_number_template`.
+    /// Each `'0'` is one digit position (the widest of `'0'..='9'`); every other
+    /// character, such as `'-'` or `'.'`, uses its own glyph width.
+    fn number_box_width(ui: &egui::Ui, font_size: f32, widest_number_template: &str) -> f32 {
+        let font_id = Self::value_font_id(font_size);
         ui.fonts(|fonts| {
-            "0123456789.-"
+            let digit_width = ('0'..='9')
+                .map(|digit| fonts.glyph_width(&font_id, digit))
+                .fold(0.0_f32, f32::max);
+            widest_number_template
                 .chars()
-                .map(|character| fonts.glyph_width(font_id, character))
-                .fold(0.0_f32, f32::max)
+                .map(|character| {
+                    if character == '0' {
+                        digit_width
+                    } else {
+                        fonts.glyph_width(&font_id, character)
+                    }
+                })
+                .sum()
         })
+    }
+
+    fn laid_out_text_width(ui: &egui::Ui, font_size: f32, text: &str) -> f32 {
+        let font_id = Self::value_font_id(font_size);
+        ui.fonts(|fonts| {
+            fonts
+                .layout_no_wrap(text.to_owned(), font_id, VALUE_TEXT_COLOR)
+                .rect
+                .width()
+        })
+    }
+
+    /// `(group_width, number_box_width)` for the centered value label.
+    /// Group width is the widest number box plus the laid-out unit, so the unit
+    /// stays at one x for every value.
+    fn value_group_geometry(
+        ui: &egui::Ui,
+        font_size: f32,
+        widest_number_template: &str,
+        unit_text: &str,
+    ) -> (f32, f32) {
+        let number_box_width = Self::number_box_width(ui, font_size, widest_number_template);
+        let unit_width = Self::laid_out_text_width(ui, font_size, unit_text);
+        (number_box_width + unit_width, number_box_width)
     }
 
     fn paint_fixed_value_with_unit(
         ui: &mut egui::Ui,
         number_text: &str,
         unit_text: &str,
-        number_digit_slots: usize,
+        widest_number_template: &str,
         value_font_size: f32,
-    ) {
+    ) -> Rect {
         let font_id = Self::value_font_id(value_font_size);
-        let figure_width = Self::value_figure_width(ui, &font_id);
-        let number_slot_width = figure_width * number_digit_slots as f32;
-        let unit_width = ui.fonts(|fonts| {
-            unit_text
-                .chars()
-                .map(|character| fonts.glyph_width(&font_id, character))
-                .sum::<f32>()
-        });
+        let (group_width, number_box_width) =
+            Self::value_group_geometry(ui, value_font_size, widest_number_template, unit_text);
         let row_height = ui.fonts(|fonts| fonts.row_height(&font_id));
-        let total_width = number_slot_width + unit_width;
+        let (rect, _response) =
+            ui.allocate_exact_size(Vec2::new(group_width, row_height), Sense::hover());
 
-        ui.allocate_ui_with_layout(
-            Vec2::new(total_width, row_height),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                ui.allocate_ui_with_layout(
-                    Vec2::new(number_slot_width, row_height),
-                    Layout::right_to_left(Align::Center),
-                    |ui| {
-                        ui.set_min_width(number_slot_width);
-                        ui.set_max_width(number_slot_width);
-                        ui.label(
-                            RichText::new(number_text)
-                                .font(font_id.clone())
-                                .color(VALUE_TEXT_COLOR)
-                                .strong(),
-                        );
-                    },
-                );
-                ui.label(
-                    RichText::new(unit_text)
-                        .font(font_id)
-                        .color(VALUE_TEXT_COLOR)
-                        .strong(),
-                );
-            },
-        );
+        let number_galley = ui.fonts(|fonts| {
+            fonts.layout_no_wrap(number_text.to_owned(), font_id.clone(), VALUE_TEXT_COLOR)
+        });
+        let unit_galley =
+            ui.fonts(|fonts| fonts.layout_no_wrap(unit_text.to_owned(), font_id, VALUE_TEXT_COLOR));
+
+        let unit_anchor = pos2(rect.left() + number_box_width, rect.center().y);
+        let number_origin = Align2::RIGHT_CENTER
+            .anchor_size(unit_anchor, number_galley.size())
+            .min;
+        let unit_origin = Align2::LEFT_CENTER
+            .anchor_size(unit_anchor, unit_galley.size())
+            .min;
+        ui.painter()
+            .galley(number_origin, number_galley, VALUE_TEXT_COLOR);
+        ui.painter()
+            .galley(unit_origin, unit_galley, VALUE_TEXT_COLOR);
+        rect
     }
 
     fn apply_dark_style(context: &egui::Context) {
@@ -164,12 +187,10 @@ impl PureToneApp {
     fn fixed_value_width(
         ui: &egui::Ui,
         font_size: f32,
-        digit_slots: usize,
+        widest_number_template: &str,
         unit_text: &str,
     ) -> f32 {
-        let font_id = Self::value_font_id(font_size);
-        let figure_width = Self::value_figure_width(ui, &font_id);
-        figure_width * digit_slots as f32 + Self::text_width(ui, unit_text, font_size)
+        Self::value_group_geometry(ui, font_size, widest_number_template, unit_text).0
     }
 
     fn packed_column_height(ui: &egui::Ui, scale: f32) -> f32 {
@@ -188,9 +209,9 @@ impl PureToneApp {
             label_size,
         ));
         let frequency =
-            Self::fixed_value_width(ui, value_size, FREQUENCY_NUMBER_DIGIT_SLOTS, " Hz");
+            Self::fixed_value_width(ui, value_size, FREQUENCY_WIDEST_NUMBER_TEMPLATE, " Hz");
         let amplitude =
-            Self::fixed_value_width(ui, value_size, AMPLITUDE_NUMBER_DIGIT_SLOTS, " dB");
+            Self::fixed_value_width(ui, value_size, AMPLITUDE_WIDEST_NUMBER_TEMPLATE, " dB");
         labels.max(frequency).max(amplitude)
     }
 
@@ -370,7 +391,7 @@ impl PureToneApp {
         title_text: &str,
         number_text: String,
         unit_text: &str,
-        number_digit_slots: usize,
+        widest_number_template: &str,
         value: &mut f32,
         range_start: f32,
         range_end: f32,
@@ -401,7 +422,7 @@ impl PureToneApp {
                 ui,
                 &number_text,
                 unit_text,
-                number_digit_slots,
+                widest_number_template,
                 layout.value_font_size,
             );
             ui.add_space(layout.padding);
@@ -433,7 +454,7 @@ impl PureToneApp {
                     "Frequency",
                     Self::format_frequency_number(frequency_hertz),
                     " Hz",
-                    FREQUENCY_NUMBER_DIGIT_SLOTS,
+                    FREQUENCY_WIDEST_NUMBER_TEMPLATE,
                     &mut self.frequency_log_normalized,
                     0.0,
                     1.0,
@@ -449,7 +470,7 @@ impl PureToneApp {
                     "Amplitude",
                     Self::format_amplitude_number(self.amplitude_decibels),
                     " dB",
-                    AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                    AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
                     &mut self.amplitude_decibels,
                     MINIMUM_AMPLITUDE_DECIBELS,
                     MAXIMUM_AMPLITUDE_DECIBELS,
@@ -485,7 +506,10 @@ impl eframe::App for PureToneApp {
 
 #[cfg(test)]
 mod layout_tests {
-    use super::{PureToneApp, AMPLITUDE_NUMBER_DIGIT_SLOTS, FREQUENCY_NUMBER_DIGIT_SLOTS};
+    use super::{
+        PureToneApp, AMPLITUDE_WIDEST_NUMBER_TEMPLATE, FREQUENCY_WIDEST_NUMBER_TEMPLATE,
+        VALUE_FONT_SIZE,
+    };
     use crate::audio_math::{
         frequency_hertz_from_log_normalized, MAXIMUM_AMPLITUDE_DECIBELS, MINIMUM_AMPLITUDE_DECIBELS,
     };
@@ -536,7 +560,7 @@ mod layout_tests {
                     "Frequency",
                     "440".to_string(),
                     " Hz",
-                    FREQUENCY_NUMBER_DIGIT_SLOTS,
+                    FREQUENCY_WIDEST_NUMBER_TEMPLATE,
                     &mut frequency,
                     0.0,
                     1.0,
@@ -548,7 +572,7 @@ mod layout_tests {
                     "Amplitude",
                     "-20.0".to_string(),
                     " dB",
-                    AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                    AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
                     &mut amplitude,
                     MINIMUM_AMPLITUDE_DECIBELS,
                     MAXIMUM_AMPLITUDE_DECIBELS,
@@ -589,7 +613,7 @@ mod layout_tests {
                     "Frequency",
                     "440".to_string(),
                     " Hz",
-                    FREQUENCY_NUMBER_DIGIT_SLOTS,
+                    FREQUENCY_WIDEST_NUMBER_TEMPLATE,
                     &mut frequency,
                     0.0,
                     1.0,
@@ -601,7 +625,7 @@ mod layout_tests {
                     "Amplitude",
                     "-20.0".to_string(),
                     " dB",
-                    AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                    AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
                     &mut amplitude,
                     MINIMUM_AMPLITUDE_DECIBELS,
                     MAXIMUM_AMPLITUDE_DECIBELS,
@@ -647,7 +671,7 @@ mod layout_tests {
                             "Frequency",
                             "440".to_string(),
                             " Hz",
-                            FREQUENCY_NUMBER_DIGIT_SLOTS,
+                            FREQUENCY_WIDEST_NUMBER_TEMPLATE,
                             &mut frequency,
                             0.0,
                             1.0,
@@ -659,7 +683,7 @@ mod layout_tests {
                             "Amplitude",
                             "-20.0".to_string(),
                             " dB",
-                            AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                            AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
                             &mut amplitude,
                             MINIMUM_AMPLITUDE_DECIBELS,
                             MAXIMUM_AMPLITUDE_DECIBELS,
@@ -687,8 +711,149 @@ mod layout_tests {
         assert_eq!(widest_frequency, "20000");
         assert_eq!(lowest_frequency, "20");
         assert_eq!(widest_amplitude, "-100.0");
-        assert!(widest_frequency.chars().count() <= FREQUENCY_NUMBER_DIGIT_SLOTS);
-        assert!(widest_amplitude.chars().count() <= AMPLITUDE_NUMBER_DIGIT_SLOTS);
+        assert_formatted_number_fits_template(&widest_frequency, FREQUENCY_WIDEST_NUMBER_TEMPLATE);
+        assert_formatted_number_fits_template(&lowest_frequency, FREQUENCY_WIDEST_NUMBER_TEMPLATE);
+        assert_formatted_number_fits_template(&widest_amplitude, AMPLITUDE_WIDEST_NUMBER_TEMPLATE);
+        assert_eq!(
+            widest_frequency.chars().count(),
+            FREQUENCY_WIDEST_NUMBER_TEMPLATE.chars().count()
+        );
+        assert_eq!(
+            widest_amplitude.chars().count(),
+            AMPLITUDE_WIDEST_NUMBER_TEMPLATE.chars().count()
+        );
+        assert!(
+            lowest_frequency.chars().count() < FREQUENCY_WIDEST_NUMBER_TEMPLATE.chars().count()
+        );
+
+        run_at(400.0, 800.0, |ui| {
+            let frequency_box_width = PureToneApp::number_box_width(
+                ui,
+                VALUE_FONT_SIZE,
+                FREQUENCY_WIDEST_NUMBER_TEMPLATE,
+            );
+            let amplitude_box_width = PureToneApp::number_box_width(
+                ui,
+                VALUE_FONT_SIZE,
+                AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
+            );
+            for number_text in ["20", "440", "19999", "20000"] {
+                let text_width = PureToneApp::text_width(ui, number_text, VALUE_FONT_SIZE);
+                assert!(
+                    text_width <= frequency_box_width,
+                    "{number_text} width {text_width} exceeds frequency box {frequency_box_width}"
+                );
+            }
+            for number_text in ["-100.0", "-99.9", "-0.0", "0.0"] {
+                let text_width = PureToneApp::text_width(ui, number_text, VALUE_FONT_SIZE);
+                assert!(
+                    text_width <= amplitude_box_width,
+                    "{number_text} width {text_width} exceeds amplitude box {amplitude_box_width}"
+                );
+            }
+        });
+    }
+
+    #[test]
+    fn value_group_stays_fixed_and_centered_for_every_value() {
+        run_at(400.0, 800.0, |ui| {
+            let layout = PureToneApp::control_layout(ui, ui.available_size());
+            ui.columns(2, |columns| {
+                place_values_and_assert_fixed_group(
+                    &mut columns[0],
+                    layout.value_font_size,
+                    FREQUENCY_WIDEST_NUMBER_TEMPLATE,
+                    " Hz",
+                    &["20000", "440", "20"],
+                );
+                place_values_and_assert_fixed_group(
+                    &mut columns[1],
+                    layout.value_font_size,
+                    AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
+                    " dB",
+                    &["-100.0", "-5.0", "0.0"],
+                );
+            });
+        });
+    }
+
+    /// Right-align `number_text` into `template`. A `'0'` slot must hold a digit.
+    /// Any other template character must appear in the formatted text.
+    fn assert_formatted_number_fits_template(number_text: &str, template: &str) {
+        let number_characters: Vec<char> = number_text.chars().collect();
+        let template_characters: Vec<char> = template.chars().collect();
+        assert!(
+            number_characters.len() <= template_characters.len(),
+            "{number_text} is longer than template {template}"
+        );
+        let leading_slots = template_characters.len() - number_characters.len();
+        for (offset, number_character) in number_characters.iter().enumerate() {
+            let template_character = template_characters[leading_slots + offset];
+            if template_character == '0' {
+                assert!(
+                    number_character.is_ascii_digit(),
+                    "{number_text} places {number_character} in a digit slot of {template}"
+                );
+            } else {
+                assert_eq!(
+                    *number_character, template_character,
+                    "{number_text} does not match the shape of {template}"
+                );
+            }
+        }
+    }
+
+    fn place_values_and_assert_fixed_group(
+        column: &mut egui::Ui,
+        value_font_size: f32,
+        widest_number_template: &str,
+        unit_text: &str,
+        number_texts: &[&str],
+    ) {
+        let column_size = column.available_size();
+        column.allocate_ui_with_layout(
+            column_size,
+            egui::Layout::top_down(egui::Align::Center),
+            |column| {
+                column.set_width(column_size.x);
+                let column_center_x = column.max_rect().center().x;
+                let (group_width, number_box_width) = PureToneApp::value_group_geometry(
+                    column,
+                    value_font_size,
+                    widest_number_template,
+                    unit_text,
+                );
+                let mut placed_groups: Vec<(Rect, f32)> = Vec::new();
+                for number_text in number_texts {
+                    let group_rect = PureToneApp::paint_fixed_value_with_unit(
+                        column,
+                        number_text,
+                        unit_text,
+                        widest_number_template,
+                        value_font_size,
+                    );
+                    let unit_left_x = group_rect.left() + number_box_width;
+                    assert!(
+                        (group_rect.center().x - column_center_x).abs() <= 0.5,
+                        "{number_text}: group center {group_center} column center {column_center_x}",
+                        group_center = group_rect.center().x
+                    );
+                    assert!(
+                        (group_rect.width() - group_width).abs() <= 0.5,
+                        "{number_text}: painted width {painted_width} geometry {group_width}",
+                        painted_width = group_rect.width()
+                    );
+                    placed_groups.push((group_rect, unit_left_x));
+                }
+                let (first_rect, first_unit_left_x) = placed_groups[0];
+                for (group_rect, unit_left_x) in &placed_groups[1..] {
+                    assert_eq!(group_rect.left(), first_rect.left());
+                    assert_eq!(group_rect.right(), first_rect.right());
+                    assert_eq!(group_rect.width(), first_rect.width());
+                    assert_eq!(*unit_left_x, first_unit_left_x);
+                }
+            },
+        );
     }
 
     #[test]
@@ -721,7 +886,7 @@ mod layout_tests {
                         "Frequency",
                         "20000".to_string(),
                         " Hz",
-                        FREQUENCY_NUMBER_DIGIT_SLOTS,
+                        FREQUENCY_WIDEST_NUMBER_TEMPLATE,
                         &mut frequency,
                         0.0,
                         1.0,
@@ -733,7 +898,7 @@ mod layout_tests {
                         "Amplitude",
                         "-100.0".to_string(),
                         " dB",
-                        AMPLITUDE_NUMBER_DIGIT_SLOTS,
+                        AMPLITUDE_WIDEST_NUMBER_TEMPLATE,
                         &mut amplitude,
                         MINIMUM_AMPLITUDE_DECIBELS,
                         MAXIMUM_AMPLITUDE_DECIBELS,
