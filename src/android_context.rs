@@ -10,7 +10,10 @@ unsafe impl Sync for AndroidNativeHandles {}
 
 static ANDROID_NATIVE_HANDLES: OnceLock<AndroidNativeHandles> = OnceLock::new();
 
-pub fn store_android_native_handles(java_vm: *mut std::ffi::c_void, activity: *mut std::ffi::c_void) {
+pub fn store_android_native_handles(
+    java_vm: *mut std::ffi::c_void,
+    activity: *mut std::ffi::c_void,
+) {
     let _ = ANDROID_NATIVE_HANDLES.set(AndroidNativeHandles { java_vm, activity });
 }
 
@@ -63,9 +66,7 @@ pub fn output_audio_device_fingerprint() -> Option<u64> {
             if device.is_null() {
                 continue;
             }
-            let device_id = environment
-                .call_method(&device, "getId", "()I", &[])?
-                .i()? as u64;
+            let device_id = environment.call_method(&device, "getId", "()I", &[])?.i()? as u64;
             let device_type = environment
                 .call_method(&device, "getType", "()I", &[])?
                 .i()? as u64;

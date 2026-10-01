@@ -129,8 +129,7 @@ fn run_software_timed_worker(shared_parameters: Arc<SharedToneParameters>) {
     while shared_parameters.should_run() {
         let started = std::time::Instant::now();
         let target_frequency_hertz = shared_parameters.frequency_hertz();
-        let target_linear_gain =
-            linear_gain_from_decibels(shared_parameters.amplitude_decibels());
+        let target_linear_gain = linear_gain_from_decibels(shared_parameters.amplitude_decibels());
         for sample in sink_buffer.iter_mut() {
             smoothed_linear_gain =
                 smooth_toward(smoothed_linear_gain, target_linear_gain, gain_coefficient);
@@ -192,9 +191,8 @@ mod android_aaudio {
         ) -> i32,
     >;
 
-    type ErrorCallback = Option<
-        unsafe extern "C" fn(stream: *mut AAudioStream, user_data: *mut c_void, error: i32),
-    >;
+    type ErrorCallback =
+        Option<unsafe extern "C" fn(stream: *mut AAudioStream, user_data: *mut c_void, error: i32)>;
 
     #[link(name = "aaudio")]
     extern "C" {
@@ -202,7 +200,10 @@ mod android_aaudio {
         fn AAudioStreamBuilder_setDirection(builder: *mut AAudioStreamBuilder, direction: i32);
         fn AAudioStreamBuilder_setSharingMode(builder: *mut AAudioStreamBuilder, sharing_mode: i32);
         fn AAudioStreamBuilder_setFormat(builder: *mut AAudioStreamBuilder, format: i32);
-        fn AAudioStreamBuilder_setChannelCount(builder: *mut AAudioStreamBuilder, channel_count: i32);
+        fn AAudioStreamBuilder_setChannelCount(
+            builder: *mut AAudioStreamBuilder,
+            channel_count: i32,
+        );
         fn AAudioStreamBuilder_setSampleRate(builder: *mut AAudioStreamBuilder, sample_rate: i32);
         fn AAudioStreamBuilder_setPerformanceMode(
             builder: *mut AAudioStreamBuilder,
@@ -293,11 +294,7 @@ mod android_aaudio {
             return;
         }
         let state = &*(user_data as *const CallbackState);
-        log::warn!(
-            "AAudio error callback: {} ({})",
-            result_text(error),
-            error
-        );
+        log::warn!("AAudio error callback: {} ({})", result_text(error), error);
         if error == AAUDIO_ERROR_DISCONNECTED || error != AAUDIO_OK {
             state.shared_parameters.request_reopen();
         }

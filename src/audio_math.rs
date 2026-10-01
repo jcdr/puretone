@@ -47,15 +47,13 @@ pub fn render_sine_sample(
     amplitude_decibels: f32,
     sample_rate_hertz: f32,
 ) -> (f32, f32) {
-    let sample = sine_sample_from_phase(phase_radians) * linear_gain_from_decibels(amplitude_decibels);
+    let sample =
+        sine_sample_from_phase(phase_radians) * linear_gain_from_decibels(amplitude_decibels);
     let next_phase = advance_phase_radians(phase_radians, frequency_hertz, sample_rate_hertz);
     (sample, next_phase)
 }
 
-pub fn one_pole_smoothing_coefficient(
-    time_constant_seconds: f32,
-    sample_rate_hertz: f32,
-) -> f32 {
+pub fn one_pole_smoothing_coefficient(time_constant_seconds: f32, sample_rate_hertz: f32) -> f32 {
     let safe_time_constant = time_constant_seconds.max(1.0e-4);
     let safe_sample_rate = sample_rate_hertz.max(1.0);
     1.0 - (-1.0 / (safe_time_constant * safe_sample_rate)).exp()
@@ -67,10 +65,7 @@ pub fn smooth_toward(current_value: f32, target_value: f32, coefficient: f32) ->
 }
 
 pub fn parameter_smoothing_coefficient(sample_rate_hertz: f32) -> f32 {
-    one_pole_smoothing_coefficient(
-        PARAMETER_SMOOTHING_TIME_CONSTANT_SECONDS,
-        sample_rate_hertz,
-    )
+    one_pole_smoothing_coefficient(PARAMETER_SMOOTHING_TIME_CONSTANT_SECONDS, sample_rate_hertz)
 }
 
 pub fn gain_smoothing_coefficient(sample_rate_hertz: f32) -> f32 {
@@ -208,7 +203,9 @@ mod tests {
         let coefficient = parameter_smoothing_coefficient(AUDIO_SAMPLE_RATE_HERTZ as f32);
         assert!(coefficient > 0.0);
         assert!(coefficient < 0.1);
-        assert!((coefficient - gain_smoothing_coefficient(AUDIO_SAMPLE_RATE_HERTZ as f32)).abs() < 1e-9);
+        assert!(
+            (coefficient - gain_smoothing_coefficient(AUDIO_SAMPLE_RATE_HERTZ as f32)).abs() < 1e-9
+        );
         assert!(
             (coefficient - frequency_smoothing_coefficient(AUDIO_SAMPLE_RATE_HERTZ as f32)).abs()
                 < 1e-9
@@ -235,12 +232,10 @@ mod tests {
         let mut current_frequency = MINIMUM_FREQUENCY_HERTZ;
         let initial_frequency_error = (target_frequency - current_frequency).abs();
         for _ in 0..samples_for_five_time_constants {
-            current_frequency =
-                smooth_toward(current_frequency, target_frequency, coefficient);
+            current_frequency = smooth_toward(current_frequency, target_frequency, coefficient);
         }
         assert!(
-            (current_frequency - target_frequency).abs()
-                < 0.02 * initial_frequency_error.max(1.0)
+            (current_frequency - target_frequency).abs() < 0.02 * initial_frequency_error.max(1.0)
         );
     }
 }
