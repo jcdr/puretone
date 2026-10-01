@@ -441,6 +441,21 @@ mod android_aaudio {
         }
     }
 
+    /// Plays the sine tone on AAudio, reopening the stream when output devices change.
+    ///
+    /// Background mute: the tone plays only while the activity window exists
+    /// (`android_context::activity_window_is_present`, checked every
+    /// `FOREGROUND_POLL_INTERVAL`). When the window is destroyed (app sent to the
+    /// background, lock screen, activity stopped) the callback fades the gain to
+    /// zero over `OUTPUT_MUTE_FADE_DURATION` (about 60 ms) and the stream is closed.
+    /// When the window comes back the stream reopens and ramps up to the unchanged
+    /// frequency and amplitude. Split screen keeps the window, so it keeps playing.
+    ///
+    /// Why: Android throttles or freezes background apps and Pure Tone has no
+    /// foreground service, so background playback gets disturbed. eframe does not
+    /// forward `MainEvent::Pause` / `Stop` (or Suspended/Resumed) to the app, and
+    /// lost focus also fires in split screen, so the native window (present between
+    /// `InitWindow` and `TerminateWindow`) is the signal.
     pub fn play_sine_stream_with_device_hotplug(
         shared_parameters: &Arc<SharedToneParameters>,
     ) -> Result<(), String> {

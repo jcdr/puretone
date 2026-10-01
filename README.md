@@ -17,6 +17,12 @@ Minimal full-screen Android app that generates a continuous mono sine wave.
 - Keeps the screen on while the app is focused  
 - Automatic reopen of the audio stream when output devices change (e.g. Bluetooth)
 
+## Behaviour
+
+The tone plays only while the app is on screen. About 60 ms after you switch to another app, the lock screen comes on or the app's window is closed, it fades out. When you return it resumes with the same frequency and amplitude. Split screen keeps playing.
+
+Android throttles or freezes apps in the background and Pure Tone has no foreground service, so background playback would be unreliable. Developer details are next to the window check in `src/audio_engine.rs`.
+
 ## Development
 
 ### Host checks

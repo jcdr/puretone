@@ -25,6 +25,9 @@ pub fn store_android_app(android_app: winit::platform::android::activity::Androi
     let _ = ANDROID_APP.set(android_app);
 }
 
+/// True while the activity's native window exists (between `MainEvent::InitWindow`
+/// and `MainEvent::TerminateWindow`). The audio engine plays only while this is true;
+/// see `play_sine_stream_with_device_hotplug` in `audio_engine.rs` for why.
 #[cfg(target_os = "android")]
 pub fn activity_window_is_present() -> bool {
     match ANDROID_APP.get() {
