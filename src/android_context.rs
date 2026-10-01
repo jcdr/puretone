@@ -10,11 +10,38 @@ unsafe impl Sync for AndroidNativeHandles {}
 
 static ANDROID_NATIVE_HANDLES: OnceLock<AndroidNativeHandles> = OnceLock::new();
 
+#[cfg(target_os = "android")]
+static ANDROID_APP: OnceLock<winit::platform::android::activity::AndroidApp> = OnceLock::new();
+
 pub fn store_android_native_handles(
     java_vm: *mut std::ffi::c_void,
     activity: *mut std::ffi::c_void,
 ) {
     let _ = ANDROID_NATIVE_HANDLES.set(AndroidNativeHandles { java_vm, activity });
+}
+
+#[cfg(target_os = "android")]
+pub fn store_android_app(android_app: winit::platform::android::activity::AndroidApp) {
+    let _ = ANDROID_APP.set(android_app);
+}
+
+#[cfg(target_os = "android")]
+pub fn activity_window_is_present() -> bool {
+    match ANDROID_APP.get() {
+        // Before store_android_app, treat the activity as visible.
+        None => true,
+        Some(android_app) => {
+            let native_window = android_app.native_window();
+            let window_is_present = native_window.is_some();
+            drop(native_window);
+            window_is_present
+        }
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn activity_window_is_present() -> bool {
+    true
 }
 
 #[cfg(target_os = "android")]
@@ -82,4 +109,14 @@ pub fn output_audio_device_fingerprint() -> Option<u64> {
 #[cfg(not(target_os = "android"))]
 pub fn output_audio_device_fingerprint() -> Option<u64> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::activity_window_is_present;
+
+    #[test]
+    fn activity_window_is_present_when_no_android_app_is_stored() {
+        assert!(activity_window_is_present());
+    }
 }

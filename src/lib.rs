@@ -33,6 +33,7 @@ fn android_main(android_app: winit::platform::android::activity::AndroidApp) {
         android_app.vm_as_ptr(),
         android_app.activity_as_ptr(),
     );
+    android_context::store_android_app(android_app.clone());
     keep_screen_on::enable_keep_screen_on_from_activity(
         android_app.vm_as_ptr(),
         android_app.activity_as_ptr(),

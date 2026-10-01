@@ -7,11 +7,14 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+const FOREGROUND_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
 pub struct SharedToneParameters {
     frequency_hertz_bits: AtomicU32,
     amplitude_decibels_bits: AtomicU32,
     should_run: AtomicBool,
     reopen_requested: AtomicBool,
+    output_muted: AtomicBool,
 }
 
 impl SharedToneParameters {
@@ -21,6 +24,7 @@ impl SharedToneParameters {
             amplitude_decibels_bits: AtomicU32::new(amplitude_decibels.to_bits()),
             should_run: AtomicBool::new(true),
             reopen_requested: AtomicBool::new(false),
+            output_muted: AtomicBool::new(false),
         })
     }
 
@@ -61,6 +65,14 @@ impl SharedToneParameters {
 
     pub fn reopen_is_requested(&self) -> bool {
         self.reopen_requested.load(Ordering::Relaxed)
+    }
+
+    pub fn set_output_muted(&self, output_muted: bool) {
+        self.output_muted.store(output_muted, Ordering::Relaxed);
+    }
+
+    pub fn output_is_muted(&self) -> bool {
+        self.output_muted.load(Ordering::Relaxed)
     }
 }
 
@@ -127,6 +139,10 @@ fn run_software_timed_worker(shared_parameters: Arc<SharedToneParameters>) {
     let mut sink_buffer = vec![0.0_f32; frames_per_chunk];
 
     while shared_parameters.should_run() {
+        if !crate::android_context::activity_window_is_present() {
+            thread::sleep(FOREGROUND_POLL_INTERVAL);
+            continue;
+        }
         let started = std::time::Instant::now();
         let target_frequency_hertz = shared_parameters.frequency_hertz();
         let target_linear_gain = linear_gain_from_decibels(shared_parameters.amplitude_decibels());
@@ -167,6 +183,7 @@ mod android_aaudio {
     use crate::android_context;
     use std::ffi::c_void;
     use std::os::raw::{c_char, c_int};
+    use std::time::Instant;
 
     const AAUDIO_OK: i32 = 0;
     const AAUDIO_DIRECTION_OUTPUT: i32 = 0;
@@ -178,6 +195,8 @@ mod android_aaudio {
     const AAUDIO_ERROR_DISCONNECTED: i32 = -899;
     const DEVICE_POLL_INTERVAL: Duration = Duration::from_millis(400);
     const REOPEN_COOLDOWN: Duration = Duration::from_millis(150);
+    // Gain smoothing time constant is 10 ms; 60 ms lets the tone fall to silence.
+    const OUTPUT_MUTE_FADE_DURATION: Duration = Duration::from_millis(60);
 
     type AAudioStream = c_void;
     type AAudioStreamBuilder = c_void;
@@ -256,12 +275,18 @@ mod android_aaudio {
             return AAUDIO_CALLBACK_RESULT_STOP;
         }
         let state = &mut *(user_data as *mut CallbackState);
-        if !state.shared_parameters.should_run() || state.shared_parameters.reopen_is_requested() {
+        if !state.shared_parameters.should_run()
+            || (state.shared_parameters.reopen_is_requested()
+                && !state.shared_parameters.output_is_muted())
+        {
             return AAUDIO_CALLBACK_RESULT_STOP;
         }
         let target_frequency_hertz = state.shared_parameters.frequency_hertz();
-        let target_linear_gain =
-            linear_gain_from_decibels(state.shared_parameters.amplitude_decibels());
+        let target_linear_gain = if state.shared_parameters.output_is_muted() {
+            0.0
+        } else {
+            linear_gain_from_decibels(state.shared_parameters.amplitude_decibels())
+        };
         let sample_rate = AUDIO_SAMPLE_RATE_HERTZ as f32;
         let output = std::slice::from_raw_parts_mut(audio_data as *mut f32, num_frames as usize);
         for sample in output.iter_mut() {
@@ -408,6 +433,14 @@ mod android_aaudio {
         }
     }
 
+    fn sleep_while_running(shared_parameters: &SharedToneParameters, duration: Duration) {
+        let started = Instant::now();
+        while shared_parameters.should_run() && started.elapsed() < duration {
+            let remaining = duration.saturating_sub(started.elapsed());
+            thread::sleep(remaining.min(FOREGROUND_POLL_INTERVAL));
+        }
+    }
+
     pub fn play_sine_stream_with_device_hotplug(
         shared_parameters: &Arc<SharedToneParameters>,
     ) -> Result<(), String> {
@@ -419,8 +452,26 @@ mod android_aaudio {
         let mut last_device_fingerprint =
             android_context::output_audio_device_fingerprint().unwrap_or(0);
         let mut opened_once = false;
+        let mut pause_was_logged = false;
 
         while shared_parameters.should_run() {
+            if !android_context::activity_window_is_present() {
+                if !pause_was_logged {
+                    log::info!("Activity window absent; pausing sine output");
+                    pause_was_logged = true;
+                }
+                thread::sleep(FOREGROUND_POLL_INTERVAL);
+                continue;
+            }
+            if pause_was_logged || shared_parameters.output_is_muted() {
+                log::info!("Activity window present; resuming sine output");
+                pause_was_logged = false;
+                shared_parameters.set_output_muted(false);
+                if let Some(fingerprint) = android_context::output_audio_device_fingerprint() {
+                    last_device_fingerprint = fingerprint;
+                }
+            }
+
             let _ = shared_parameters.take_reopen_request();
             match open_and_start_stream(shared_parameters, carry_state) {
                 Ok((stream, callback_state_pointer)) => {
@@ -428,41 +479,86 @@ mod android_aaudio {
                     log::info!(
                         "AAudio stream started (device fingerprint {last_device_fingerprint})"
                     );
+                    let mut next_device_fingerprint_poll_at = Instant::now();
                     while shared_parameters.should_run() {
+                        if !android_context::activity_window_is_present() {
+                            if !pause_was_logged {
+                                log::info!("Activity window absent; pausing sine output");
+                                pause_was_logged = true;
+                            }
+                            // Clear a disconnect reopen so the callback fades instead of stopping.
+                            let _ = shared_parameters.take_reopen_request();
+                            shared_parameters.set_output_muted(true);
+                            sleep_while_running(shared_parameters, OUTPUT_MUTE_FADE_DURATION);
+                            break;
+                        }
                         if shared_parameters.take_reopen_request() {
                             log::info!("AAudio reopen requested by callback");
                             break;
                         }
-                        if let Some(fingerprint) =
-                            android_context::output_audio_device_fingerprint()
-                        {
-                            if fingerprint != last_device_fingerprint {
-                                log::info!(
-                                    "Audio output devices changed ({last_device_fingerprint} -> {fingerprint}); reopening stream"
-                                );
-                                last_device_fingerprint = fingerprint;
-                                shared_parameters.request_reopen();
-                                break;
+                        if Instant::now() >= next_device_fingerprint_poll_at {
+                            next_device_fingerprint_poll_at = Instant::now() + DEVICE_POLL_INTERVAL;
+                            if let Some(fingerprint) =
+                                android_context::output_audio_device_fingerprint()
+                            {
+                                if fingerprint != last_device_fingerprint {
+                                    log::info!(
+                                        "Audio output devices changed ({last_device_fingerprint} -> {fingerprint}); reopening stream"
+                                    );
+                                    last_device_fingerprint = fingerprint;
+                                    shared_parameters.request_reopen();
+                                    break;
+                                }
                             }
                         }
-                        thread::sleep(DEVICE_POLL_INTERVAL);
+                        thread::sleep(FOREGROUND_POLL_INTERVAL);
                     }
                     carry_state = close_stream(stream, callback_state_pointer);
+                    if shared_parameters.output_is_muted() {
+                        carry_state.smoothed_linear_gain = 0.0;
+                    }
                 }
                 Err(error_message) => {
                     if !opened_once {
                         return Err(error_message);
                     }
                     log::error!("AAudio reopen failed: {error_message}");
-                    thread::sleep(REOPEN_COOLDOWN);
+                    sleep_while_running(shared_parameters, REOPEN_COOLDOWN);
                 }
             }
 
-            if shared_parameters.should_run() {
-                thread::sleep(REOPEN_COOLDOWN);
+            if shared_parameters.should_run() && !shared_parameters.output_is_muted() {
+                sleep_while_running(shared_parameters, REOPEN_COOLDOWN);
             }
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SharedToneParameters;
+
+    #[test]
+    fn output_mute_does_not_change_frequency_or_amplitude() {
+        let shared_parameters = SharedToneParameters::new(440.0, -12.0);
+        assert!(!shared_parameters.output_is_muted());
+
+        shared_parameters.set_output_muted(true);
+        assert!(shared_parameters.output_is_muted());
+        assert!((shared_parameters.frequency_hertz() - 440.0).abs() < f32::EPSILON);
+        assert!((shared_parameters.amplitude_decibels() - (-12.0)).abs() < f32::EPSILON);
+
+        shared_parameters.set_frequency_hertz(880.0);
+        shared_parameters.set_amplitude_decibels(-6.0);
+        assert!(shared_parameters.output_is_muted());
+        assert!((shared_parameters.frequency_hertz() - 880.0).abs() < f32::EPSILON);
+        assert!((shared_parameters.amplitude_decibels() - (-6.0)).abs() < f32::EPSILON);
+
+        shared_parameters.set_output_muted(false);
+        assert!(!shared_parameters.output_is_muted());
+        assert!((shared_parameters.frequency_hertz() - 880.0).abs() < f32::EPSILON);
+        assert!((shared_parameters.amplitude_decibels() - (-6.0)).abs() < f32::EPSILON);
     }
 }
